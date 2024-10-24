@@ -62,6 +62,12 @@ import static helpers.Interfaces.*;
                         optionType = OptionType.BOOLEAN
                 ),
                 @ScriptConfiguration(
+                    name = "Safespot Willow",
+                    description = "Safespot at willows, intented for powercutting for lowl lvl",
+                    defaultValue = "false",
+                    optionType = OptionType.BOOLEAN
+            ),
+                @ScriptConfiguration(
                         name = "Use world hopper?",
                         description = "Would you like to hop worlds based on your hop profile settings?",
                         defaultValue = "true",
@@ -71,13 +77,17 @@ import static helpers.Interfaces.*;
 )
 
 public class OakCutter extends AbstractScript {
-
+    private boolean initialLogAcquired = false;  // Track if the first log has been gained
+    private int lastItemCount = -1;
+    private long lastInventoryChangeTime = 0;
+    private boolean inventoryChangedRecently = false;
     public static boolean isTrulyIdleState = false;  // Field to store idle state
     private long lastIdleCheckTime = 0;  // Track last check time for `isTrulyIdle()`
     public static boolean bankingMode;
     public static String Location;
     public static String treeType;
     public static Boolean bankLogs;
+    public static Boolean useSafeSpot;
     public static String hopProfile;
     public static Boolean hopEnabled;
     public static Boolean useWDH;
@@ -88,10 +98,9 @@ public class OakCutter extends AbstractScript {
     public static List<Tile> bankTileList = Collections.emptyList();  // Use this list in Bank class
     MapChunk mapChunk;
 
-    public int Rsleep(int min, int max) {
-        Random random = new Random();
-        return random.nextInt(max - min + 1) + min;  // Returns a random value between min and max
-    }
+
+
+    
 
     @Override
     public void onStart() {
@@ -100,6 +109,7 @@ public class OakCutter extends AbstractScript {
         Location = configs.get("Location");
         treeType = configs.get("Tree type");
         bankLogs = Boolean.valueOf(configs.get("Bank logs"));
+        useSafeSpot = Boolean.valueOf(configs.get("Safespot Willow"));
         hopProfile = configs.get("Use world hopper?");
         hopEnabled = Boolean.valueOf(configs.get("Use world hopper?.enabled"));
         useWDH = Boolean.valueOf(configs.get("Use world hopper?.useWDH"));
@@ -113,8 +123,8 @@ public class OakCutter extends AbstractScript {
                 break;
             case "Draynor Village":
                 Logger.log("MoveTo Draynor Selected Mapchunk");
-                mapChunk = new MapChunk(new String[] {"48-50"}, "0");
                 if (treeType.equals("Oak")) {
+                    mapChunk = new MapChunk(new String[] {"48-50"}, "0");
                     // Initialize target tiles for cutting trees
                     targetTileList = Arrays.asList(
                         new Tile(12403, 12725, 0),
@@ -123,12 +133,23 @@ public class OakCutter extends AbstractScript {
                     );
                 }
                 if (treeType.equals("Willow")) {
+                    mapChunk = new MapChunk(new String[] {"48-50", "48-51", "49-50", "47-50"}, "0");
                     // Initialize target tiles for cutting trees
-                    targetTileList = Arrays.asList(
-                       // new Tile(12403, 12725, 0),
-                       // new Tile(12403, 12721, 0),
-                       // new Tile(12403, 12717, 0)
-                    );
+                    if (!useSafeSpot) {
+                        Logger.log("Tiles for NO safespot selected");
+                        targetTileList = Arrays.asList(
+                            new Tile(12339, 12697, 0),
+                            new Tile(12347, 12689, 0),
+                            new Tile(12351, 12681, 0)
+
+                        );
+                    } else {
+                        Logger.log("Tile for safespot selected");
+                        mapChunk = new MapChunk(new String[] {"48-50", "48-51", "49-50", "47-50"}, "0");
+                        targetTileList = Arrays.asList(
+                            new Tile(12355, 12653, 0)
+                        );
+                    }
                 }
 
                 // Initialize bank tiles
@@ -171,12 +192,20 @@ public class OakCutter extends AbstractScript {
                );
         }
     }
+
+
+
+    public int Rsleep(int min, int max) {
+        Random random = new Random();
+        return random.nextInt(max - min + 1) + min;  // Returns a random value between min and max
+    }
     
     
     
     @Override
     public void poll() {
         updateTrulyIdleState();
+        updateInventoryChange();
         Condition.sleep(Rsleep(5, 25));
 
         if (!GameTabs.isInventoryTabOpen()) {
@@ -248,36 +277,57 @@ public class OakCutter extends AbstractScript {
         }
     }
 
-    public boolean monitorInventoryChange() {
-        int initialItemCount = Inventory.count(LogsToBank, 0.8); // Get the initial inventory count
-        int currentItemCount;
+
     
-        // Monitor inventory changes continuously before deciding to move or interact with firepit
-        for (int i = 0; i < 17; i++) { // Check every 500-600ms, up to 16 times (about 8 seconds total)
-            currentItemCount = Inventory.count(LogsToBank, 0.8);
+    // Field to track the time of the last inventory change
+
+
+    public boolean updateInventoryChange() {
+        int currentItemCount = Inventory.count(LogsToBank, 0.8);  // Get the current count
+        int gracePeriod = 6500;  // 3 seconds grace period
     
-            if (Script.isTimeForBreak()) {
-                return false; // Return false to handle the break
-            }
-    
-            // Return here to restart poll if it's time for a world hop
-            if (currentItemCount == 0 && Player.isIdle()) {
-                Logger.log("Woodcutting ");
-                return false;
-            }
-            // Check if the inventory has changed
-            if (currentItemCount != initialItemCount) {
-                Logger.log("Woodcutting in progress..");
-                return true;  // Inventory change detected
-            }
-    
-            Condition.sleep(Rsleep(300, 400));  // Wait 500-600ms between checks
+        // If it's time for a break or the script is stopping, return false
+        if (Script.isScriptStopping() || Script.isTimeForBreak()) {
+            return false;
         }
     
-        // If no inventory change after multiple checks, return false
-        Logger.log("No inventory change after multiple checks. Proceeding with further actions.");
+        // First-time initialization of item count
+        if (lastItemCount == -1) {
+            lastItemCount = currentItemCount;
+        }
+    
+        // If inventory count changes, reset the grace period timer
+        if (currentItemCount != lastItemCount) {
+            Logger.log("Inventory change detected! Resetting grace period.");
+    
+            // Mark the first log as acquired once inventory changes for the first time
+            initialLogAcquired = true;
+    
+            lastItemCount = currentItemCount;  // Update the item count
+            lastInventoryChangeTime = System.currentTimeMillis();  // Reset the grace period timer
+            inventoryChangedRecently = true;
+            return true;
+        }
+    
+        // If within grace period, we consider inventory changed recently
+        if (inventoryChangedRecently && (System.currentTimeMillis() - lastInventoryChangeTime < gracePeriod)) {
+            Logger.log("Within grace period. Considering inventory recently changed.");
+            return true;
+        }
+    
+        // If no changes and the grace period has expired
+        if (System.currentTimeMillis() - lastInventoryChangeTime >= gracePeriod) {
+            Logger.log("Grace period expired. No recent inventory changes detected.");
+            inventoryChangedRecently = false;  // Reset flag
+            return false;
+        }
+    
         return false;
     }
+
+
+    
+    
 
     public boolean isTrulyIdle() {
         long startTime = System.currentTimeMillis();
@@ -310,5 +360,8 @@ public class OakCutter extends AbstractScript {
         // 2. Player.isIdle() returned true at least once
         return pixelShiftStayedZero || isIdleFlag;
     }
+
+
+    
 }
     

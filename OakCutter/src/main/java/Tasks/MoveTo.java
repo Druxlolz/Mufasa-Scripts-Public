@@ -46,7 +46,7 @@ public class MoveTo extends Task {
                     return false;
                 }
             }
-            selectedBankTile = bankTileList.get(new Random().nextInt(targetTileList.size()));
+            selectedBankTile = bankTileList.get(new Random().nextInt(bankTileList.size()));
             Logger.log("Inventory is full, proceeding to bank.");
             return true;  // Proceed to the bank if banking mode is active and inventory is full
         }
@@ -81,12 +81,12 @@ public class MoveTo extends Task {
 
         // Check if selectedTile is null (which can happen if targetTileList was null or empty)
         if (!Inventory.isFull()) {
-            if (!Player.tileEquals(playerTile, selectedTile)) {
-                Logger.log("Executing walk to trees: " + selectedTile);
-                Walker.walkTo(selectedTile);
-                Condition.wait(() -> Player.tileEquals(playerTile, selectedTile), 200, 10);
-            } else if (selectedTile == null) {
+            if (selectedTile == null) {
                 Logger.log("Error: Selected tile is null. Cannot move.");
+            } else if (!Player.tileEquals(playerTile, selectedTile)) {
+                Logger.log("Executing walk to trees: " + selectedTile);
+                Walker.step(selectedTile);
+                Condition.wait(() -> Player.tileEquals(playerTile, selectedTile), 200, 10);
             }
         }
 
