@@ -114,13 +114,22 @@ public class OakCutter extends AbstractScript {
             case "Draynor Village":
                 Logger.log("MoveTo Draynor Selected Mapchunk");
                 mapChunk = new MapChunk(new String[] {"48-50"}, "0");
-
-                // Initialize target tiles for cutting trees
-                targetTileList = Arrays.asList(
-                    new Tile(12403, 12725, 0),
-                    new Tile(12403, 12721, 0),
-                    new Tile(12403, 12717, 0)
-                );
+                if (treeType.equals("Oak")) {
+                    // Initialize target tiles for cutting trees
+                    targetTileList = Arrays.asList(
+                        new Tile(12403, 12725, 0),
+                        new Tile(12403, 12721, 0),
+                        new Tile(12403, 12717, 0)
+                    );
+                }
+                if (treeType.equals("Willow")) {
+                    // Initialize target tiles for cutting trees
+                    targetTileList = Arrays.asList(
+                       // new Tile(12403, 12725, 0),
+                       // new Tile(12403, 12721, 0),
+                       // new Tile(12403, 12717, 0)
+                    );
+                }
 
                 // Initialize bank tiles
                 bankTileList = Arrays.asList(
@@ -173,11 +182,6 @@ public class OakCutter extends AbstractScript {
         if (!GameTabs.isInventoryTabOpen()) {
             GameTabs.openInventoryTab();
         }
-
-        double pixelShift = Player.currentPixelShift();
-        Logger.log("Current Pixel Shift: " + pixelShift);
-        boolean idler = Player.isIdle();
-        Logger.log("Er vi idle? " + idler);
 
         // Run tasks
         for (Task task : woodcuttingTasks) {
@@ -280,7 +284,7 @@ public class OakCutter extends AbstractScript {
         boolean pixelShiftStayedZero = true;  // Assume idle until proven otherwise
         boolean isIdleFlag = false;
         
-        while (System.currentTimeMillis() - startTime < 400) {  // Track over 2 seconds
+        while (System.currentTimeMillis() - startTime < 400 && !Script.isScriptStopping() && !Script.isTimeForBreak()) {  // Track over 2 seconds
             double pixelShift = Player.currentPixelShift();
             boolean isIdle = Player.isIdle();
 

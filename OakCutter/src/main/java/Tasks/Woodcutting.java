@@ -80,12 +80,17 @@ public class Woodcutting extends Task {
 
 
     private void tapOnTree() {
-        for (Color targetColor : targetColors) {
-            Logger.log("Attempting to tap color: " + targetColor);
-            Client.tap(targetColor, searchRect, tolerance); // Simulate a tap on the target color
-            Logger.log("Tap successful for color: " + targetColor);
-            Condition.sleep(Rsleep(1000, 1600));  // Random sleep after tapping
-            break;  // Only perform one tap, then exit the loop
+        if (LogsToBank == 1521) {
+            for (Color targetColor : targetColors) {
+                Logger.log("Attempting to tap color: " + targetColor);
+                Client.tap(targetColor, searchRect, tolerance); // Simulate a tap on the target color
+                Logger.log("Tap successful for color: " + targetColor);
+                Condition.sleep(Rsleep(1000, 1600));  // Random sleep after tapping
+                break;  // Only perform one tap, then exit the loop
+            }
+        }
+        if (LogsToBank == 1519) {
+            // logic for clicking tree here
         }
     }
 }
